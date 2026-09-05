@@ -1,0 +1,2 @@
+# proyecto1_arquitectura_de_computadores
+proyecto de arquitectura de computadores
