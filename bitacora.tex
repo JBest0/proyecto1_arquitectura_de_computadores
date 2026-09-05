@@ -1,0 +1,217 @@
+\documentclass[11pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{hyperref}
+
+\titleformat{\section}{\normalfont\Large\bfseries}{\thesection}{1em}{}
+\titleformat{\subsection}{\normalfont\large\bfseries}{\thesubsection}{1em}{}
+
+\title{Bitácora de Diseño e Implementación\\
+\large Proyecto Individual --- Lógica Combinacional: Puerta con Contraseña\\
+\large CE 1107 --- Fundamentos de Arquitectura de Computadores}
+\author{[Nombre del estudiante]}
+\date{}
+
+\begin{document}
+\maketitle
+\vspace{-1.5cm}
+
+\begin{center}
+\begin{tabular}{ll}
+\textbf{Curso:} & CE 1107 --- Fundamentos de Arquitectura de Computadores \\
+\textbf{Profesor:} & Luis Chavarría Zamora \\
+\textbf{Institución:} & Instituto Tecnológico de Costa Rica \\
+\textbf{Repositorio:} & [enlace al repositorio Git] \\
+\end{tabular}
+\end{center}
+
+\vspace{0.5cm}
+\hrule
+\vspace{0.5cm}
+
+\section*{Jueves 3 de septiembre de 2026}
+
+\subsection*{9:00 a.m. -- 11:00 a.m. --- Investigación y decisiones de diseño}
+
+Se dedicó este bloque a investigación preliminar y a la toma de decisiones fundamentales
+de diseño antes de iniciar cualquier esquemático.
+
+\textbf{Decisión de tecnología:} se optó por trabajar con compuertas \textbf{CMOS}
+(familia 4000), en lugar de TTL, dado que CMOS ofrece mayor accesibilidad y comodidad
+de uso en aplicaciones de baja potencia, además de mayor inmunidad al ruido y menor
+consumo estático en comparación con TTL. Esta decisión condiciona todo el diseño
+posterior, ya que fija los niveles de tensión de operación (0V--5V) y los
+circuitos integrados específicos a utilizar.
+
+Se investigaron los siguientes temas para sustentar el diseño:
+\begin{itemize}[nosep]
+    \item Funcionamiento interno y patrones de excitación de un display de
+    7 segmentos (configuración cátodo común vs. ánodo común y su efecto sobre
+    la lógica de manejo de cada segmento).
+    \item Comportamiento de compuertas lógicas básicas en tecnología CMOS
+    (inversor, AND, OR, XNOR) y sus equivalentes disponibles en la serie 4000
+    (CD4069, CD4081, CD4073).
+    \item Funcionamiento del flip-flop tipo D, con énfasis en su configuración
+    como \emph{toggle} (realimentando $Q'$ hacia $D$) para lograr una salida que
+    cambia de estado en cada pulso de reloj, sin necesidad de lógica de detección
+    de flanco adicional.
+\end{itemize}
+
+Esta investigación fue la base conceptual utilizada en el bloque de trabajo de
+la tarde para plantear los esquemáticos.
+
+\subsection*{2:00 p.m. -- 4:00 p.m. --- Diseño de los esquemáticos por módulo}
+
+Con base en la investigación de la mañana, se definió la arquitectura del sistema
+en tres módulos independientes, cada uno con su propia lógica booleana:
+
+\begin{enumerate}
+    \item \textbf{Ingreso y verificación de contraseña.} Recibe la contraseña de
+    3 dígitos en base 5 (código elegido: \texttt{1-4-3}), representada mediante
+    9 líneas de entrada (3 bits por dígito), y produce una señal \texttt{Correcto}
+    que indica si la combinación ingresada coincide con la contraseña definida.
+
+    \item \textbf{Cambio de estado de la puerta.} Un flip-flop tipo D configurado
+    como \emph{toggle}, que cambia el estado de la puerta (abierta/cerrada) cada
+    vez que se confirma una contraseña correcta. El estado se indica mediante dos
+    LEDs (verde = abierta, rojo = cerrada).
+
+    \item \textbf{Anuncio en el display.} Un decodificador simplificado que
+    muestra en un display de 7 segmentos si el sistema está \emph{leyendo}
+    (símbolo ``L'') o si la contraseña ingresada fue \emph{inválida}
+    (símbolo ``E'').
+\end{enumerate}
+
+\subsubsection*{Ecuaciones del módulo 1 --- Comparador de contraseña}
+
+Para la contraseña \texttt{1-4-3} en base 5, cada dígito se compara contra su
+valor binario fijo mediante una simplificación: dado que el valor de referencia
+de cada bit ($B_i$) es constante, la compuerta XNOR de comparación se reduce a
+una línea directa (si $B_i=1$) o a un inversor (si $B_i=0$).
+
+\begin{align*}
+\text{Dígito 1 (valor 1, código 001)}: \quad Eq_1 &= A_2' \cdot A_1' \cdot A_0 \\
+\text{Dígito 2 (valor 4, código 100)}: \quad Eq_2 &= A_2 \cdot A_1' \cdot A_0' \\
+\text{Dígito 3 (valor 3, código 011)}: \quad Eq_3 &= A_2' \cdot A_1 \cdot A_0 \\[4pt]
+\text{Señal de contraseña correcta}: \quad Correcto &= Eq_1 \cdot Eq_2 \cdot Eq_3
+\end{align*}
+
+\subsubsection*{Ecuaciones del módulo 2 --- Disparo del toggle}
+
+\begin{align*}
+Trigger &= P \cdot Correcto
+\end{align*}
+
+donde $P$ es la señal del botón de confirmar. Esta señal alimenta la entrada de
+reloj (CLK) de un flip-flop D en modo \emph{toggle} ($D = Q'$), de forma que el
+estado de la puerta conmuta con cada confirmación correcta, sin requerir lógica
+adicional de detección de flanco.
+
+\subsubsection*{Ecuaciones del módulo 3 --- Anuncio en display}
+
+\begin{align*}
+S_0 &= P \cdot Correcto' \\
+a = g &= S_0 \\
+b = c &= 0 \text{ (GND fijo)} \\
+d = e = f &= 1 \text{ (Vcc fijo)}
+\end{align*}
+
+\textbf{Decisión de diseño documentada:} originalmente el enunciado contemplaba
+cuatro estados de anuncio (leyendo, inválida, abriendo, cerrando), lo que
+requeriría 2 bits de estado. Sin embargo, dado que el estado de apertura/cierre
+de la puerta ya se comunica mediante los LEDs del módulo 2, se decidió no
+duplicar esa información en el display, reduciendo el sistema a solo 2 estados
+(leyendo/inválida) representables con 1 bit ($S_0$). Esto permite que los
+segmentos $b$, $c$, $d$, $e$ y $f$ queden cableados de forma fija a Vcc/GND, sin
+necesidad de compuertas adicionales, simplificando considerablemente el circuito
+sin pérdida de funcionalidad requerida para este avance.
+
+\vspace{0.3cm}
+\hrule
+\vspace{0.3cm}
+
+\section*{Sábado 5 de septiembre de 2026}
+
+\subsection*{9:00 a.m. -- 1:00 p.m. --- Implementación en TinkerCAD}
+
+Se implementó el diseño de los tres módulos en el simulador TinkerCAD, elegido
+por su simplicidad de uso y por ofrecer una experiencia de armado relativamente
+cercana a la de un circuito físico real en protoboard.
+
+\textbf{Circuitos integrados utilizados:}
+\begin{itemize}[nosep]
+    \item CD4069 (hexa inversor) --- para los inversores del comparador de
+    contraseña.
+    \item CD4081 (AND doble de 2 entradas) / CD4073 (AND triple de 3 entradas)
+    --- para las compuertas AND del comparador y de las señales $Trigger$ y
+    $S_0$.
+    \item 74HC74 (flip-flop D doble) --- para el módulo de cambio de estado.
+\end{itemize}
+
+\textbf{Incidencias resueltas durante el armado:}
+
+\begin{enumerate}
+    \item \emph{Compuertas quemadas durante el cableado de switches.} Se
+    detectó un cableado diagonal que puenteaba columnas no relacionadas de la
+    protoboard, generando una ruta de baja impedancia entre Vdd y GND. Se
+    corrigió verificando el trayecto exacto de cada conexión y asegurando que
+    cada entrada tuviera su resistencia de \emph{pull-down} (10\,k$\Omega$)
+    hacia GND, evitando entradas flotantes.
+
+    \item \emph{Ambos LEDs permanecían encendidos simultáneamente.} Se
+    identificó que los pines \texttt{PRE} y \texttt{CLR} del 74HC74 son activos
+    en bajo (a diferencia del CD4013, cuyos pines equivalentes \texttt{SET} y
+    \texttt{RESET} son activos en alto). Al conectar \texttt{PRE} y \texttt{CLR}
+    a GND —replicando la lógica del CD4013— se forzaba una condición inválida de
+    preset y clear simultáneos, obligando ambas salidas ($Q$ y $Q'$) a estado
+    alto al mismo tiempo. La corrección consistió en conectar ambos pines a Vcc
+    para desactivarlos correctamente.
+\end{enumerate}
+
+Al finalizar el bloque, los tres módulos (comparador de contraseña, toggle de
+estado de puerta y anuncio en display) fueron verificados de forma independiente
+en la simulación, confirmando el comportamiento esperado según las ecuaciones
+booleanas derivadas el 3 de septiembre.
+
+\subsection*{Simulación funcional en Logisim Evolution}
+
+Se simuló el módulo de comparación de contraseña en Logisim Evolution, verificando
+el comportamiento esperado de las señales $Eq_1$, $Eq_2$, $Eq_3$, $Correcto$
+(etiquetada $C$ en el esquema), $S_0$, $S_1$ y las salidas hacia los LEDs verde y
+rojo del flip-flop D. La simulación confirmó que el circuito funciona
+correctamente según las ecuaciones booleanas derivadas el 3 de septiembre. El
+archivo de proyecto (\texttt{.circ}) se incluye en el \texttt{.zip} de la
+entrega.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\textwidth]{logisim_comparador.png}
+    \caption{Esquemático simulado en Logisim Evolution: comparador de
+    contraseña ($Eq_1$--$Eq_3$ y $Correcto$), decodificador de anuncios
+    ($S_0$) y disparo del flip-flop D hacia los LEDs de estado de la puerta.}
+\end{figure}
+
+\vspace{0.3cm}
+\hrule
+\vspace{0.3cm}
+
+\section*{Pendientes para próximas sesiones}
+
+\begin{itemize}[nosep]
+    \item Armado físico en protoboard con la disciplina de niveles CMOS
+    (0V--5V), usando la simulación de Logisim como referencia de comparación.
+    \item Documentar el debounce del pulsador de confirmar como decisión de
+    diseño pendiente de implementación.
+    \item Documentar formalmente el criterio usado para descartar los estados
+    de apertura/cierre en el display, para incluirlo en el paper.
+\end{itemize}
+
+\end{document}
